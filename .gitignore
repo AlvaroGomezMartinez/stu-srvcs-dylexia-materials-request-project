@@ -1,0 +1,22 @@
+# .gitignore for Google Apps Script projects
+# Ignore OAuth credentials, API keys, and sensitive config files
+
+# Ignore .clasp.json (contains projectId, scriptId, etc.)
+.clasp.json
+
+# Ignore local environment files
+.env
+.env.*
+
+# Ignore backup or temp files
+*.bak
+*.tmp
+
+# Ignore node_modules if using clasp with TypeScript or npm
+node_modules/
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore Mac system files
+.DS_Store

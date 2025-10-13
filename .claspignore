@@ -1,0 +1,12 @@
+# Ignore everything
+**/*
+
+# Except these files needed for Google Apps Script
+!appsscript.json
+!Code.js
+
+# Node modules and other common ignores
+node_modules/
+.DS_Store
+.env
+.git/
