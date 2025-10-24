@@ -10,7 +10,7 @@ This is a Google Apps Script automation tool for processing dyslexia materials r
 
 - Processes form submissions from "Form Responses 1" sheet
 - Categorizes responses by campus type using predefined NISD campus lists
-- Distributes data to destination sheets: "ES" (Elementary), "MS" (Middle School), "HS" (High School), "SpSch" (Special School)
+- Distributes data to destination sheets: "ES" (Elementary), "MS" (Middle School), "HS" (High School)
 - Designed to run as a form submission trigger for real-time processing
 
 ## Key Features
