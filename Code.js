@@ -94,7 +94,7 @@ const nisdElementaryCampusNames = [
   "Wanke",
   "Ward",
   "Wernli",
-  "Westwood Terrace"
+  "Westwood Terrace",
 ];
 
 /**
@@ -106,7 +106,7 @@ const nisdSpecialSchools = [
   "Holmgreen Center High School",
   "Northside Alternative HS",
   "Northside Alternative MS",
-  "Reddix Center"
+  "Reddix Center",
 ];
 
 /**
@@ -135,7 +135,7 @@ const nisdHighCampusNames = [
   "Sotomayor",
   "Stevens",
   "Taft",
-  "Warren"
+  "Warren",
 ];
 
 /**
@@ -168,22 +168,32 @@ const nisdMiddleCampusNames = [
   "Straus",
   "Vale",
   "Zachry",
-  "Zachry Magnet"
+  "Zachry Magnet",
 ];
 /**
- * Sorts and appends rows from 'Form Responses 1' to 'ES', 'MS', or 'HS' sheets based on the 'Campus' value in column C.
+ * Sorts and appends the new form submission to 'ES', 'MS', or 'HS' sheets based on the 'Campus' value.
  * To be triggered on form submit.
  *
  * @function
+ * @param {GoogleAppsScript.Events.SheetsOnFormSubmit} e - The form submit event object
  * @returns {void}
  */
-function sortAndAppendByCampus() {
+function sortAndAppendByCampus(e) {
+  // If no event object (manual execution), fall back to processing all rows
+  if (!e || !e.values) {
+    console.log("No event object found, processing manually");
+    processAllRows();
+    return;
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sourceSheet = ss.getSheetByName("Form Responses 1");
   if (!sourceSheet) return;
-  var data = sourceSheet.getDataRange().getValues();
-  if (data.length < 2) return; // No data
-  var headers = data[0];
+
+  // Get headers to find campus column index
+  var headers = sourceSheet
+    .getRange(1, 1, 1, sourceSheet.getLastColumn())
+    .getValues()[0];
   var campusColIdx = headers.indexOf("Campus");
   if (campusColIdx === -1) campusColIdx = 2; // fallback to column C (index 2)
 
@@ -207,7 +217,74 @@ function sortAndAppendByCampus() {
   );
   var hsSet = new Set(nisdHighCampusNames.concat(Array.from(hsSpecial)));
 
-  // Collect rows for each sheet
+  // Process only the new submission from the event
+  var newRow = e.values;
+  var campus = newRow[campusColIdx];
+
+  if (esSet.has(campus)) {
+    appendRows(esSheet, [newRow]);
+  } else if (msSet.has(campus) || msSpecial.has(campus)) {
+    appendRows(msSheet, [newRow]);
+  } else if (hsSet.has(campus)) {
+    appendRows(hsSheet, [newRow]);
+  }
+  // If campus not found, skip (no action needed)
+}
+
+/**
+ * Fallback function to process all rows when no event object is available (manual execution).
+ * Uses timestamp-based duplicate checking to prevent re-adding existing data.
+ *
+ * @function
+ * @returns {void}
+ */
+function processAllRows() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sourceSheet = ss.getSheetByName("Form Responses 1");
+  if (!sourceSheet) return;
+  var data = sourceSheet.getDataRange().getValues();
+  if (data.length < 2) return; // No data
+  var headers = data[0];
+  var campusColIdx = headers.indexOf("Campus");
+  var timestampColIdx = headers.indexOf("Timestamp");
+  if (campusColIdx === -1) campusColIdx = 2; // fallback to column C (index 2)
+  if (timestampColIdx === -1) timestampColIdx = 0; // fallback to column A (index 0)
+
+  // Prepare destination sheets
+  var esSheet = ss.getSheetByName("ES");
+  var msSheet = ss.getSheetByName("MS");
+  var hsSheet = ss.getSheetByName("HS");
+  if (!esSheet || !msSheet || !hsSheet) return;
+
+  // Get existing timestamps from destination sheets to avoid duplicates
+  var existingTimestamps = new Set();
+  [esSheet, msSheet, hsSheet].forEach(function (sheet) {
+    if (sheet.getLastRow() > 0) {
+      var existingData = sheet.getDataRange().getValues();
+      for (var i = 0; i < existingData.length; i++) {
+        var timestamp = existingData[i][timestampColIdx];
+        if (timestamp) {
+          existingTimestamps.add(timestamp.toString());
+        }
+      }
+    }
+  });
+
+  // Build campus lookup sets for fast matching
+  var esSet = new Set(nisdElementaryCampusNames);
+  var msSet = new Set(nisdMiddleCampusNames);
+  var msSpecial = new Set([
+    "Holmgreen Center Middle School",
+    "Northside Alternative MS",
+  ]);
+  var hsSpecial = new Set(
+    nisdSpecialSchools.filter(function (s) {
+      return !msSpecial.has(s);
+    })
+  );
+  var hsSet = new Set(nisdHighCampusNames.concat(Array.from(hsSpecial)));
+
+  // Collect rows for each sheet (only new ones)
   var esRows = [];
   var msRows = [];
   var hsRows = [];
@@ -215,7 +292,14 @@ function sortAndAppendByCampus() {
   // For each row (skip header)
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
+    var timestamp = row[timestampColIdx];
     var campus = row[campusColIdx];
+
+    // Skip if this timestamp already exists in destination sheets
+    if (existingTimestamps.has(timestamp.toString())) {
+      continue;
+    }
+
     if (esSet.has(campus)) {
       esRows.push(row);
     } else if (msSet.has(campus) || msSpecial.has(campus)) {
@@ -226,10 +310,14 @@ function sortAndAppendByCampus() {
     // If campus not found, skip
   }
 
-  // Batch append for performance
+  // Batch append for performance (only new rows)
   appendRows(esSheet, esRows);
   appendRows(msSheet, msRows);
   appendRows(hsSheet, hsRows);
+
+  console.log(
+    "Processed " + (esRows.length + msRows.length + hsRows.length) + " new rows"
+  );
 }
 
 /**
